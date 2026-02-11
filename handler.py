@@ -177,11 +177,11 @@ def handler(job):
     
     # 워크플로우 파일 선택 (이미지가 있으면 I2V, 없으면 T2V)
     if has_image:
-        workflow_file = "workflow/LTX-2 I2V WORKFLOW_renew.json"
+        workflow_file = "workflow/ltx2_i2v.json"
         workflow_type = "I2V"
         logger.info("이미지 입력이 감지되어 I2V (Image-to-Video) 워크플로우를 사용합니다.")
     else:
-        workflow_file = "workflow/video_ltx2_t2v_renew.json"
+        workflow_file = "workflow/ltx2_t2v.json"
         workflow_type = "T2V"
         logger.info("이미지 입력이 없어 T2V (Text-to-Video) 워크플로우를 사용합니다.")
     
@@ -214,34 +214,44 @@ def handler(job):
     
     # I2V 전용 설정
     if has_image:
-        # 프롬프트 설정 (161:120 - positive, 161:115 - negative)
-        prompt["161:120"]["inputs"]["text"] = positive_prompt
-        prompt["161:115"]["inputs"]["text"] = negative_prompt
+        # 프롬프트 설정 (92:3 - positive, 92:4 - negative)
+        if "92:3" in prompt:
+            prompt["92:3"]["inputs"]["text"] = positive_prompt
+        if "92:4" in prompt:
+            prompt["92:4"]["inputs"]["text"] = negative_prompt
         
         # 이미지 로드 (98)
-        prompt["98"]["inputs"]["image"] = image_path
+        if "98" in prompt:
+            prompt["98"]["inputs"]["image"] = image_path
         
-        # 이미지 리사이즈 설정 (161:148 - ImageResizeKJv2)
-        prompt["161:148"]["inputs"]["width"] = adjusted_width
-        prompt["161:148"]["inputs"]["height"] = adjusted_height
+        # 이미지 리사이즈 설정 (102 - ResizeImageMaskNode)
+        if "102" in prompt:
+            prompt["102"]["inputs"]["resize_type.width"] = adjusted_width
+            prompt["102"]["inputs"]["resize_type.height"] = adjusted_height
         
-        # Length 설정 (161:203 - PrimitiveInt, frames_number로 사용)
-        prompt["161:203"]["inputs"]["value"] = length
+        # Length 설정 (92:62 - PrimitiveInt)
+        if "92:62" in prompt:
+            prompt["92:62"]["inputs"]["value"] = length
         
-        # Seed 설정 (161:119 - RandomNoise)
-        prompt["161:119"]["inputs"]["noise_seed"] = seed
+        # Seed 설정 (92:11 - RandomNoise)
+        if "92:11" in prompt:
+            prompt["92:11"]["inputs"]["noise_seed"] = seed
         
-        # Steps 설정 (161:106 - LTXVScheduler)
-        prompt["161:106"]["inputs"]["steps"] = steps
+        # Steps 설정 (92:9 - LTXVScheduler)
+        if "92:9" in prompt:
+            prompt["92:9"]["inputs"]["steps"] = steps
         
-        # CFG 설정 (161:140 - CFGGuider, 메인 CFG)
-        prompt["161:140"]["inputs"]["cfg"] = cfg
+        # CFG 설정 (92:47 - CFGGuider)
+        if "92:47" in prompt:
+            prompt["92:47"]["inputs"]["cfg"] = cfg
         
-        # Frame rate 설정 (161:174 - DF_Int_to_Float, 161:202 - LTXVEmptyLatentAudio)
-        if "161:174" in prompt:
-            prompt["161:174"]["inputs"]["Value"] = int(frame_rate)
-        if "161:202" in prompt:
-            prompt["161:202"]["inputs"]["frame_rate"] = int(frame_rate)
+        # Frame rate 설정 (92:51 - LTXVEmptyLatentAudio, 92:22 - LTXVConditioning, 92:97 - CreateVideo)
+        if "92:51" in prompt:
+            prompt["92:51"]["inputs"]["frame_rate"] = int(frame_rate)
+        if "92:22" in prompt:
+            prompt["92:22"]["inputs"]["frame_rate"] = int(frame_rate)
+        if "92:97" in prompt:
+            prompt["92:97"]["inputs"]["fps"] = int(frame_rate)
     else:
         # T2V 전용 설정
         # 프롬프트 설정 (92:3 - positive, 92:4 - negative)
