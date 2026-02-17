@@ -11,6 +11,9 @@ import urllib.parse
 import binascii # Base64 에러 처리를 위해 import
 import subprocess
 import time
+import boto3
+from botocore.exceptions import NoCredentialsError
+
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,6 +21,71 @@ logger = logging.getLogger(__name__)
 
 server_address = os.getenv('SERVER_ADDRESS', '127.0.0.1')
 client_id = str(uuid.uuid4())
+
+def upload_to_r2(video_data, file_name):
+    """
+    비디오 데이터를 Cloudflare R2에 업로드하고 URL을 반환합니다.
+    환경변수 R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME이 필요합니다.
+    """
+    try:
+        account_id = os.environ.get('R2_ACCOUNT_ID')
+        access_key = os.environ.get('R2_ACCESS_KEY_ID')
+        secret_key = os.environ.get('R2_SECRET_ACCESS_KEY')
+        bucket_name = os.environ.get('R2_BUCKET_NAME')
+        custom_domain = os.environ.get('R2_CUSTOM_DOMAIN')
+
+        if not all([account_id, access_key, secret_key, bucket_name]):
+            logger.error("R2 업로드를 위한 환경변수가 설정되지 않았습니다.")
+            return None
+
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=f'https://{account_id}.r2.cloudflarestorage.com',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key
+        )
+
+        # Base64 디코딩
+        if isinstance(video_data, str):
+            try:
+                video_bytes = base64.b64decode(video_data)
+            except binascii.Error:
+                video_bytes = video_data.encode('utf-8')
+        else:
+            video_bytes = video_data
+
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=file_name,
+            Body=video_bytes,
+            ContentType='video/mp4'
+        )
+        
+        if custom_domain:
+            url = f"{custom_domain}/{file_name}"
+            # http/https prefix check
+            if not url.startswith("http"):
+                 url = f"https://{url}"
+            logger.info(f"✅ R2 업로드 성공 (Public URL): {url}")
+            return url
+        else:
+            # Custom Domain이 없는 경우 Presigned URL 생성 (1시간 유효)
+            try:
+                url = s3_client.generate_presigned_url(
+                    ClientMethod='get_object',
+                    Params={'Bucket': bucket_name, 'Key': file_name},
+                    ExpiresIn=3600
+                )
+                logger.info(f"✅ R2 업로드 성공 (Presigned URL): {url}")
+                return url
+            except Exception as e:
+                logger.error(f"❌ Presigned URL 생성 실패: {e}")
+                return None
+
+    except Exception as e:
+        logger.error(f"❌ R2 업로드 중 오류 발생: {e}")
+        return None
+
 def to_nearest_multiple_of_16(value):
     """주어진 값을 가장 가까운 16의 배수로 보정, 최소 16 보장"""
     try:
@@ -106,15 +174,10 @@ def get_image(filename, subfolder, folder_type):
     with urllib.request.urlopen(f"{url}?{url_values}") as response:
         return response.read()
 
-def get_history(prompt_id):
-    url = f"http://{server_address}:8188/history/{prompt_id}"
-    logger.info(f"Getting history from: {url}")
-    with urllib.request.urlopen(url) as response:
-        return json.loads(response.read())
-
-def get_videos(ws, prompt):
+def find_generated_video(ws, prompt, filename_prefix):
     prompt_id = queue_prompt(prompt)['prompt_id']
-    output_videos = {}
+    
+    # 웹소켓으로 실행 완료 대기
     while True:
         out = ws.recv()
         if isinstance(out, str):
@@ -125,28 +188,38 @@ def get_videos(ws, prompt):
                     break
         else:
             continue
-
-    history = get_history(prompt_id)[prompt_id]
-    for node_id in history['outputs']:
-        node_output = history['outputs'][node_id]
-        videos_output = []
-        # 'gifs' 또는 'videos' 키 확인
-        video_list = None
-        if 'gifs' in node_output:
-            video_list = node_output['gifs']
-        elif 'videos' in node_output:
-            video_list = node_output['videos']
+            
+    # 실행 완료 후 파일 검색
+    output_dir = "/ComfyUI/output"
+    logger.info(f"Searching for video with prefix '{filename_prefix}' in {output_dir}")
+    
+    # 5초간 재시도 (파일 시스템 동기화 지연 대비)
+    for _ in range(5):
+        if not os.path.exists(output_dir):
+            time.sleep(1)
+            continue
+            
+        for file in os.listdir(output_dir):
+            if file.startswith(filename_prefix) and (file.endswith(".mp4") or file.endswith(".mov")):
+                file_path = os.path.join(output_dir, file)
+                logger.info(f"Found video file: {file_path}")
+                
+                 # 파일 읽기 및 Base64 인코딩
+                with open(file_path, 'rb') as f:
+                    video_data = base64.b64encode(f.read()).decode('utf-8')
+                
+                # (선택 사항) 파일 삭제 - 서버리스 환경에서는 자동 정리되지만 명시적으로 삭제
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted temporary file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete file {file_path}: {e}")
+                    
+                return video_data
         
-        if video_list:
-            for video in video_list:
-                # fullpath를 이용하여 직접 파일을 읽고 base64로 인코딩
-                if 'fullpath' in video:
-                    with open(video['fullpath'], 'rb') as f:
-                        video_data = base64.b64encode(f.read()).decode('utf-8')
-                    videos_output.append(video_data)
-        output_videos[node_id] = videos_output
-
-    return output_videos
+        time.sleep(1)
+    
+    return None
 
 def load_workflow(workflow_path):
     # 현재 파일의 디렉토리를 기준으로 절대 경로 생성
@@ -280,6 +353,10 @@ def handler(job):
         if "92:99" in prompt and prompt["92:99"]["class_type"] == "PrimitiveInt":
             prompt["92:99"]["inputs"]["value"] = int(frame_rate)
 
+    # Filename Prefix 설정 (75 - SaveVideo)
+    if "75" in prompt:
+         prompt["75"]["inputs"]["filename_prefix"] = task_id
+         
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
     
@@ -315,14 +392,23 @@ def handler(job):
             if attempt == max_attempts - 1:
                 raise Exception("웹소켓 연결 시간 초과 (3분)")
             time.sleep(5)
-    videos = get_videos(ws, prompt)
+            
+    # 비디오 생성 및 검색
+    video_base64 = find_generated_video(ws, prompt, task_id)
     ws.close()
 
-    # 이미지가 없는 경우 처리
-    for node_id in videos:
-        if videos[node_id]:
-            return {"video": videos[node_id][0]}
+    if video_base64:
+        if job_input.get("return_url", False):
+            # R2 업로드
+            file_name = f"{task_id}.mp4"
+            video_url = upload_to_r2(video_base64, file_name)
+            if video_url:
+                return {"video_url": video_url}
+            else:
+                 logger.warning("R2 업로드 실패, Base64 비디오를 반환합니다.")
+
+        return {"video": video_base64}
     
-    return {"error": "비디오를를 찾을 수 없습니다."}
+    return {"error": "비디오를 찾을 수 없습니다."}
 
 runpod.serverless.start({"handler": handler})

@@ -1,18 +1,38 @@
 {
-    "title": "Wan2.2 with LoRA & LTX2",
-    "description": "Advanced AI model for generating high-quality videos from images with natural motion and realistic animations. you can use at most 3 LoRA pairs",
-    "type": "serverless",
-    "category": "video",
-    "iconUrl": "https://github.com/wlsdml1114/Engui_Studio/blob/main/assets/logo.png?raw=true",
-  
-    "config": {
-      "runsOn": "GPU",
-      "containerDiskInGb": 10,
-  
-      "gpuCount": 1,
-      "gpuIds": "ADA_32_PRO",
-      "allowedCudaVersions": [
-        "12.8"
-      ]
+  "title": "Wan2.2 with LoRA & LTX2",
+  "description": "Advanced AI model for generating high-quality videos from images with natural motion and realistic animations. you can use at most 3 LoRA pairs",
+  "type": "serverless",
+  "category": "video",
+  "iconUrl": "https://github.com/wlsdml1114/Engui_Studio/blob/main/assets/logo.png?raw=true",
+  "config": {
+    "runsOn": "GPU",
+    "containerDiskInGb": 10,
+    "gpuCount": 1,
+    "gpuIds": "ADA_32_PRO",
+    "allowedCudaVersions": [
+      "12.8"
+    ]
+  },
+  "env": [
+    {
+      "key": "R2_ACCOUNT_ID",
+      "value": "{{ RUNPOD_SECRET_R2_ACCOUNT_ID }}"
+    },
+    {
+      "key": "R2_ACCESS_KEY_ID",
+      "value": "{{ RUNPOD_SECRET_R2_ACCESS_KEY_ID }}"
+    },
+    {
+      "key": "R2_SECRET_ACCESS_KEY",
+      "value": "{{ RUNPOD_SECRET_R2_SECRET_ACCESS_KEY }}"
+    },
+    {
+      "key": "R2_BUCKET_NAME",
+      "value": "{{ RUNPOD_SECRET_R2_BUCKET_NAME }}"
+    },
+    {
+      "key": "R2_CUSTOM_DOMAIN",
+      "value": "{{ RUNPOD_SECRET_R2_CUSTOM_DOMAIN }}"
     }
+  ]
 }
