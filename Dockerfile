@@ -63,6 +63,26 @@ RUN wget -q https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/
 RUN wget -q https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/umt5-xxl-enc-bf16.safetensors -O /ComfyUI/models/text_encoders/umt5-xxl-enc-bf16.safetensors
 RUN wget -q https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1_VAE_bf16.safetensors -O /ComfyUI/models/vae/Wan2_1_VAE_bf16.safetensors
 
+RUN wget -q https://huggingface.co/SRodge00/ultimatedeepthroat/resolve/main/wan22-ultimatedeepthroat-i2v-102epoc-high-k3nk.safetensors -O /ComfyUI/models/loras/ultimatedeepthroatHigh.safetensors
+
+RUN wget -q https://huggingface.co/SRodge00/ultimatedeepthroat/resolve/main/wan22-ultimatedeepthroat-I2V-101epoc-low-k3nk.safetensors -O /ComfyUI/models/loras/ultimatedeepthroatLow.safetensors
+
+RUN wget -q https://huggingface.co/pr0nai/wan_2.2_loras/resolve/main/blink_titjob/high.safetensors -O /ComfyUI/models/loras/TitJobHigh.safetensors
+
+RUN wget -q https://huggingface.co/pr0nai/wan_2.2_loras/resolve/main/blink_titjob/low.safetensors -O /ComfyUI/models/loras/TitJobLow.safetensors
+
+RUN wget -q https://huggingface.co/SRodge00/hjblink/resolve/main/iGoon%20-%20Blink_Handjob_I2V_HIGH.safetensors -O /ComfyUI/models/loras/Blink_Handjob_I2V_HIGH.safetensors
+
+RUN wget -q https://huggingface.co/pr0nai/wan_2.2_loras/resolve/main/blink_handjob/low.safetensors -O /ComfyUI/models/loras/Blink_Handjob_I2V_LOW.safetensors
+
+RUN wget -q https://huggingface.co/Emp1418/Blink_miss/resolve/main/iGoon_Blink_Missionary_I2V_HIGH%20v2.safetensors -O /ComfyUI/models/loras/iGoon_Blink_Missionary_I2V_HIGH v2.safetensors"
+
+RUN wget -q https://huggingface.co/FataleCherry/Lo_BlinkMissionary/resolve/main/iGoon%20-%20Blink_Missionary_I2V_LOW%20v2.safetensors -O /ComfyUI/models/loras/iGoon - Blink_Missionary_I2V_LOW v2.safetensors"
+
+RUN wget -q https://huggingface.co/jortestingss/facec/resolve/main/Wan22_CumV2_High.safetensors -O /ComfyUI/models/loras/CumHigh.safetensors
+
+RUN wget -q https://huggingface.co/Paolo222/DPaint/resolve/main/Wan22_CumV2_Low.safetensors -O /ComfyUI/models/loras/CumLow.safetensors
+
 COPY . .
 COPY extra_model_paths.yaml /ComfyUI/extra_model_paths.yaml
 RUN chmod +x /entrypoint.sh
